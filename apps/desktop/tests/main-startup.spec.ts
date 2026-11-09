@@ -497,6 +497,21 @@ afterEach(async () => {
 })
 
 describe('desktop main startup', () => {
+  it('waits for the initial welcome state before reporting launch analytics', async () => {
+    await import('../src/main.ts')
+    await harness.preparing.promise
+    harness.prepared.resolve()
+    await harness.hostStarted.promise
+    const host = harness.hosts[0]!
+    const welcome = Promise.withResolvers<Response>()
+    host.fetch.mockReturnValueOnce(welcome.promise)
+    host.ready.resolve()
+    await vi.waitFor(() => { expect(host.fetch).toHaveBeenCalledOnce() })
+    expect(harness.analytics).not.toHaveBeenCalled()
+    welcome.resolve(Response.json({ hasApiKey: true, writable: true, localePreference: null }))
+    await vi.waitFor(() => { expect(harness.analytics).toHaveBeenCalledWith(expect.objectContaining({ eventName: 'desktop_app_launch' })) })
+  })
+
   it.each([true, false])('selects the package manager before Host startup (packaged=%s)', async (packaged) => {
     harness.app.isPackaged = packaged
     await readyForUpdate()

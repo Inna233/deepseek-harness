@@ -545,7 +545,6 @@ async function main(): Promise<void> {
         injections = ready.injections
         welcomeBackend = connectDesktopWelcome(ready.url, cookie)
         analyticsEnabled = await welcomeBackend.analyticsEnabled().catch(() => false)
-        if (!reportedLaunch) { reportedLaunch = true; void track('desktop_app_launch', {}) }
         stopAccount?.()
         const accountBackend = welcomeBackend.account
         stopAccount = accountBackend.watch((state) => {
@@ -675,6 +674,7 @@ async function main(): Promise<void> {
         await Promise.all([manager.applyRelease(), prepareHostEnvironment()])
       })
       if (backend.host !== undefined) await openInitialWindow()
+      if (!reportedLaunch) { reportedLaunch = true; void track('desktop_app_launch', {}) }
       if (backend.host !== undefined) updateJournal?.action('workspace-ready')
       // The existing Web document resumes through the boot IPC response.
     })().catch((error: unknown) => {

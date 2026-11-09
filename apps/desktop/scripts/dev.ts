@@ -112,6 +112,7 @@ async function main(): Promise<void> {
       { encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }).trim(),
     pnpmVersion,
   }
+  console.log('desktop development: preparing the local project')
   prepareDevelopmentProject({
     projectDir: join(DEVELOPMENT_ROOT, 'project'),
     cliDir: join(REPOSITORY_ROOT, 'apps', 'cli'),
@@ -120,7 +121,9 @@ async function main(): Promise<void> {
     release,
     target: resolveDesktopBuildTarget(),
   })
+  console.log('desktop development: preparing and checking the Node.js and Python runtime; this can take a few minutes')
   await preparePrimaryRuntime()
+  console.log('desktop development: runtime checks passed; opening the application')
   await launchElectron()
 }
 

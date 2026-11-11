@@ -84,6 +84,27 @@ const WITHHELD_RESPONSE_HEADERS = [
 /** Host routes whose responses carry immutable cache headers keyed by a per-process revision. */
 const PLUGIN_BUNDLE_PATH = /^\/plugins\//u
 
+/** Retry a short local Host disconnect before failing an application asset request. */
+async function fetchLocalHost(request: Request, target: URL, init: RequestInit): Promise<Response> {
+  const retryableMethod = request.method === 'GET' || request.method === 'HEAD'
+  const localHost = ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(target.hostname)
+  const attempts = retryableMethod && localHost ? 3 : 1
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await fetch(target, init)
+      if (attempt + 1 < attempts && [502, 503, 504].includes(response.status)) {
+        await response.body?.cancel()
+        await new Promise(resolvePromise => setTimeout(resolvePromise, 50 * (attempt + 1)))
+        continue
+      }
+      return response
+    } catch (error) {
+      if (attempt + 1 >= attempts || request.signal.aborted) throw error
+      await new Promise(resolvePromise => setTimeout(resolvePromise, 50 * (attempt + 1)))
+    }
+  }
+}
+
 /**
  * Forward local application requests to its authenticated Host, preserving streaming and cancellation.
  * Plugin bundle responses lose their `cache-control` for `no-store`: the Host marks them immutable
@@ -105,7 +126,7 @@ export async function forwardWebRequest(request: Request, host: string, cookie: 
   for (const name of ['host', 'origin', 'cookie', 'sec-fetch-site']) headers.delete(name)
   headers.set('cookie', cookie)
   const init = { method: request.method, headers, body: request.body, signal: request.signal, duplex: 'half', redirect: 'manual' as const }
-  const response = await fetch(target, init)
+  const response = await fetchLocalHost(request, target, init)
   const outgoing = new Headers(response.headers)
   for (const name of WITHHELD_RESPONSE_HEADERS) outgoing.delete(name)
   if (PLUGIN_BUNDLE_PATH.test(source.pathname)) outgoing.set('cache-control', 'no-store')

@@ -79,6 +79,20 @@ it('replaces the immutable cache header of plugin bundles with no-store and leav
   expect(asset.headers.get('cache-control')).toBe(immutable)
 })
 
+it('retries a transient local Host disconnect while forwarding a safe asset request', async () => {
+  const fetch = vi.fn()
+    .mockRejectedValueOnce(Object.assign(new TypeError('fetch failed'), {
+      cause: Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }),
+    }))
+    .mockResolvedValueOnce(new Response('bundle', { headers: { 'content-type': 'text/javascript' } }))
+  vi.stubGlobal('fetch', fetch)
+  const response = await forwardWebRequest(
+    new Request('dsh-app://app/plugins/??a/client.js&rev=1'), 'http://127.0.0.1:1234/', 'session=owned')
+  expect(fetch).toHaveBeenCalledTimes(2)
+  expect(response.status).toBe(200)
+  expect(await response.text()).toBe('bundle')
+})
+
 it('refuses another page origin without forwarding its request', async () => {
   const fetch = vi.fn()
   vi.stubGlobal('fetch', fetch)
